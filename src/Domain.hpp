@@ -13,6 +13,9 @@ class Domain {
     // this is bad but i'm doing it:
     std::vector<std::vector<double> > returnDomain(){return dom;};
 
+    double operator() (unsigned int row, unsigned int col) const;
+
+
   private:
     std::vector<std::vector<double> > dom;
     int rows;
@@ -21,6 +24,7 @@ class Domain {
   
     //get row, get col?
     //assign row, assign col.
+
   
 };
 
