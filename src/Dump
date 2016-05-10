@@ -1,0 +1,453 @@
+
+void unitTests(Material mat, ElasticPrimState iPrimL, ElasticPrimState iPrimR)
+{
+	cout << "perform simple solution array tests " << endl;
+	/* printArray(mat); */
+
+#ifdef debug_
+
+	mat.sys.Eos.checkEosConstants();
+
+	cout << "Prim stateL" << endl;
+	cout << iPrimL << endl;
+	cout << "Density" << mat.sys.Density(iPrimL) << endl;
+	cout << "Strain tensor L " << mat.sys.strainTensor(iPrimL.F_()) << endl;
+	cout << "INVARIANTS L " << endl;
+	cout << mat.sys.getInvariants(iPrimL.F_()) << endl;	
+
+	cout << "Prim stateR" << endl;
+	cout << iPrimR << endl;
+	cout << "Density" << mat.sys.Density(iPrimR) << endl;
+	cout << "Strain tensor L " << mat.sys.strainTensor(iPrimR.F_()) << endl;
+	cout << "INVARIANTS R " << endl;
+	cout << mat.sys.getInvariants(iPrimR.F_()) << endl;	
+
+	ElasticState iStateL = mat.sys.primitiveToConservative(iPrimL);
+	ElasticState iStateR = mat.sys.primitiveToConservative(iPrimR);
+
+	cout <<"Cons stateL" << endl;
+	cout << iStateL << endl;
+	cout << "Density" << mat.sys.Density(iStateL) << endl;
+	cout << endl;
+
+	cout <<"Cons stateR" << endl;
+	cout << iStateR << endl;
+	cout << "Density" << mat.sys.Density(iStateR) << endl;
+	cout << endl;
+
+	ElasticPrimState iPrimL2 = mat.sys.conservativeToPrimitive(iStateL);
+	ElasticPrimState iPrimR2 = mat.sys.conservativeToPrimitive(iStateR);
+
+	cout << "Prim stateL" << endl;
+	cout << iPrimL2 << endl;
+	cout << "Density" << mat.sys.Density(iPrimL2) << endl;
+ 	cout << endl;
+	cout << "INVARIANTS L " << endl;
+	cout << mat.sys.getInvariants(iPrimL.F_()) << endl;	
+
+	cout << "Prim stateR" << endl;
+	cout << iPrimR2 << endl;
+	cout << "Density" << mat.sys.Density(iPrimR2) << endl;
+	cout << endl;
+	cout << "INVARIANTS R " << endl;
+	cout << mat.sys.getInvariants(iPrimR.F_()) << endl;	
+
+//---------------------
+//
+
+	cout << "Check EOS constants" << endl;
+	mat.sys.Eos.checkEosConstants();
+#endif
+}
+
+//Elastic1D barton1 100 bartonInitialOut bartonFinalOut
+/* int main(int argc, char ** argv) */
+/* { */
+/* 	string outFile, outInitFile; */
+/* 	int Ni; */
+/* 	if(argc != 3){ */
+/* 		cout << "Insufficient Parameters: exit" << endl; */
+/* 		cout << "Number of parameters " << argc << endl; */
+/* 		exit(1); */
+/* 	} */
+/* 	else { */
+/* 		const string icStr = string(argv[1]); */
+/*     stringstream convert(argv[2]); */
+/*     if (!(convert >> Ni)){ cout << "input positive integer number of cells"; exit(0); } */
+/*     else */
+/*       convert >> Ni; */
+
+/* 		if(icStr == "barton1") */ 
+/* 		{ */
+/* 			icType = Barton1; */
+/* 		} */
+/* 		else if(icStr == "barton2") */
+/* 		{ */
+/* 			icType = Barton2; */
+/* 		} */
+/* 		else if(icStr == "barton3") */
+/* 		{ */
+/* 			icType = Barton3; */	
+/* 		} */
+/* 		else */ 
+/* 		{ */
+/* 			cerr << "Unknown problem type \'" << icStr << "\' - options are barton1, barton2, barton3,\n"; */
+/* 			exit(1); */
+/* 		} */
+/*   } */
+/* 	/1* * Setting& setting = cfg.lookup("tests.test1"); *2/ *1/ */
+/* 	double CFL = 0.6; */
+
+/* 	cout << " Solve barton test with " << Ni << " cells " << " and output to " << outInitFile << " and " << outFile << endl; */
+/* 	Domain dom; */
+
+/*   outInitFile = "Output/test.dat"; */
+/*   outFile = "Output/testInit.dat"; */
+
+/* 	string matStr; */
+/* 	/1* initialize(dom, tf, Ni, outFreq, matstr); *1/ */
+	
+/* 	Material * mat; */
+/* 	double iface; */
+/* 	Matrix3d FL, FR; */
+/* 	Vector3d uL, uR; */
+/* 	double SL, SR; */
+
+/* 	double t, tf, dt, outFreq; */
+
+/* 	if(icType == Barton1) */
+/* 	{ */
+/* 		tf = 6.0e-7;                 // Final time */
+/* 		outFreq = 1e-1;            // Output frequency */    
+/* 		iface = 0.005; */	
+/* 		dom = Domain(Ni, 2, 0.01); // Domain */
+/* 		matStr = "copper"; */
+
+/* 		FL <<	 0.98, 0, 0, 0.02, 1., 0.1, 0, 0, 1.; */
+/* 		uL << 0, 500., 1000.; */		
+/* 		SL = 1000.; */
+
+/* 		FR << 1., 0, 0, 0, 1., 0.1, 0, 0, 1.; */
+/* 		uR << 0, 0, 0; */
+/* 		SR = 0.; */
+/* 		// new Romenski */
+/* 	} */
+/* 	if(icType == Barton2) */
+/* 	{ */
+/* 		tf = 6.0e-7;                 // Final time */
+/* 		outFreq = 1e-1;            // Output frequency */    
+/* 		iface = 0.005; */	
+/* 		dom = Domain(Ni, 2, 0.01); // Domain */
+/* 		matStr = "copper"; */
+
+/* 		FL << 1., 0, 0,	-0.01, 0.95, 0.02, -0.015, 0, 0.9; */
+/* 		uL << 2000., 0, 100.; */
+/* 		SL = 0; */
+
+/* 		FR << 1., 0, 0, 0.015, 0.95, 0, -0.01, 0, 0.9; */
+/* 		uR << 0, -30., -10.; */
+/* 		SR = 0; */
+/* 		// new romenski */
+/* 	} */
+
+/* #ifdef debug_ */
+/* 	cout << "Completed initial conditions " << endl; */
+/* #endif */
+
+/* 	//create primitive states first then convert to conservative (using system function) */
+/* 	// do not need density in Eos for this (or material) since we can convert to */ 
+	
+/* 	if(matStr == "copper"){ */
+/* 		ElasticEOS Eos("copper"); */
+/* 		mat = new Material("copper", dom, Eos); */
+/* 	} */
+/* 	else { */
+/* 		cout << "No valid material" << endl; */
+/* 		exit(1); */
+/* 	} */
+
+/* 	ElasticPrimState iPrimL(uL, FL, SL); //think about const safety for these */
+/* 	ElasticPrimState iPrimR(uR, FR, SR); */ 
+
+/* 	ElasticState iStateL = mat->sys.primitiveToConservative(iPrimL); */
+/* 	ElasticState iStateR = mat->sys.primitiveToConservative(iPrimR); */
+
+/* 	ICInterface(*mat, iface, iStateL, iStateR); */
+	
+
+/* #ifdef debug_ */
+
+/* 	unitTests(*mat, iPrimL, iPrimR); //check all initialized parameters 	/1* output(dom,outputInitial); *1/ */
+/* 	printArray(*mat); */
+/* 	/1* exit(1); *1/ */
+/* #endif */
+
+/* 	t = 0; */
+/* 	int step = 0, outStep = 0; */ 
+
+/* 	/1* output initially *1/ */
+/* 	outputGnu(outInitFile, *mat, outStep); */
+
+/* 	while(t < tf) */
+/* 	{ */
+/* 		BCs(*mat); */
+/* 		//1. calculate time step: CFL and boundary conditions pg 495 */
+/* 		dt = getMinDt(*mat); */
+/* 		/1* if(step < 10)	{dt /= 10;} *1/ */
+/* 		dt *= CFL; */
+
+/* 		t += dt; */		
+
+/*     if(t < outStep * outFreq && t + dt > outStep * outFreq) { */
+/*       dt = outStep * outFreq - t; */
+/*     } */
+    
+/*     if(t >= outStep * outFreq) */ 
+/*     { */
+/*       outputGnu(outFile, *mat, outStep); */
+/*       cerr << "Saved results to output file " << outStep << "\n"; */
+/*       ++outStep; */
+/*     } */
+
+/* 		/1* if(t > tf) *1/ */
+/* 		/1* { *1/ */				
+/* 		/1* 	t -= dt; *1/ */
+/* 		/1* 	dt = tf - t; *1/ */
+/* 		/1* 	t += dt; // should equal tf *1/ */
+/* 		/1* } *1/ */
+
+/* 		solveX(*mat, dt); */
+
+/* 		++step; */
+
+/* 		// output every time step */
+/* 		cout.precision(3); */
+
+/* 		cout << " [" << outStep << "] " << setw(6) << step << setw(6) << "Time " << setw(6) << t << */ 
+/* 						setw(15) << " Remaining " << setw(6) <<tf-t<< endl; */
+/* 		/1* break; *1/ */
+/* 	} */
+
+/* 	outputGnu(outFile, *mat, outStep); */
+/* #ifdef debug_ */
+/* 	printArray(*mat); */
+/* #endif */
+
+/*   cout << outInitFile << " " << outFile << endl; */
+/*   return 0; */
+  
+/*   } */		
+
+
+    void originalRead (const char* filepath){
+
+      Config config;
+
+      config.readFile(filepath);
+
+      Setting& root = config.getRoot(); 
+
+      Setting& simulation = root["simulation"];
+
+      cellCountX = simulation["domain"]["cells"]["x"];
+
+      xMin = simulation["domain"]["dimensions"]["x"][0];
+      xMax = simulation["domain"]["dimensions"]["x"][1];
+
+      deltaX = (xMax - xMin)/cellCountX;
+
+      if(simulation.exists("space")){
+        Setting& space = simulation["space"];
+        if(std::string(space.c_str()) == "cartesian"){
+          cartesian = true;
+        }
+        if(std::string(space.c_str()) == "curvilinear"){
+          curvilinear = true;
+          cartesian = false;
+        }
+        if(std::string(space.c_str()) == "cut-cell"){
+          cut_cell = true;
+          cartesian = false;
+        }
+      }
+
+      if(simulation.exists("time")){
+        time = true;
+        end_time = simulation["time"]["end"];
+      }
+
+      if(simulation.exists("output")){
+        Setting& output = simulation["output"];
+        filePath = output["directory"].c_str();
+        fileName = output["name"].c_str();
+        frequency = output["frequency"];
+        start_output = output["start_output"];
+        end_output = output["end_output"];
+      }
+
+      if(simulation.exists("method")){
+        Setting& method = simulation["method"];
+        if(std::string(method.c_str()) == "WAF"){
+          WAF = true;
+          MUSCL = false;
+          SLIC = false;
+        }
+        else if(std::string(method.c_str()) == "MUSCL"){
+          MUSCL = true;
+          WAF = false;
+          SLIC = false;
+        }
+        else if(std::string(method.c_str()) == "SLIC"){
+          SLIC = true;
+          WAF = false;
+          MUSCL = false;
+        }
+      }
+
+      if(cut_cell){
+        if(simulation.exists("geometry")){
+          Setting& geometry = simulation["geometry"];
+          geometryPath = geometry["directory"].c_str();
+        }
+      }
+    }
+
+      /* << mat.sol[i].rho_()/1e3 << '\t' */ 
+			/* << [i].u_(0)/1000.<< '\t' */ 
+			/* << mat.sol[i].u_(1)/1000.<< '\t' */ 
+			/* << mat.sol[i].u_(2)/1000.<< '\t' */ 
+			/* << mat.sol[i].sigma_(0,0)/1e9<< '\t' */ 
+			/* << mat.sol[i].sigma_(0,1)/1e9<< '\t' */ 
+			/* << mat.sol[i].sigma_(0,2)/1e9 << '\t' */
+			/* << mat.sol[i].sigma_(1,1)/1e9 << '\t' */
+			/* << mat.sol[i].sigma_(1,2)/1e9 << '\t' */ 
+			/* << mat.sol[i].sigma_(2,2)/1e9 << '\t' */
+			/* << mat.sol[i].S_() << '\t' */
+			/* << mat.sol[i].getInvariant(0) << '\t' */
+			/* << mat.sol[i].getInvariant(1) << '\t' */
+			/* << mat.sol[i].getInvariant(2) << '\t' << endl; */
+
+
+/* void ICInterface(Material mat, const double iface, ElasticState left, ElasticState right){ */
+/* 	unsigned int i; */
+/* 	for(i = gCs; i < cells*disctyX + gCs; i++) */
+/* 	{ */
+/* 		dom[i] = ElasticStateL; */		
+/* 	} */
+/* 	for(i; i < N - gCs; i++) */
+/* 	{ */	
+/* 		dom[i] = ElasticStateR; */
+/* 	} */	
+/* 	setBCs(domain); */
+
+/* } */ 
+        /* cfg.lookupValue("slChoice", slLimChoice); */
+        /* std::cout << "slChoice " << slLimChoice << std::endl; */
+        /* cfg.lookupValue("base", baseDir); */
+        // can either use lookup here or index it as shown below 
+        //
+
+void printArray(Material mat)
+{
+	/* inline std::ostream& operator<<(std::ostream& os, ElasticState& param) */
+	/* { */
+	/* param.initialStates(os); */
+	/* os << "Current states \n" << */
+	/* 	  "Density\t"    << param.rho_() << "\n" */
+	/* 	  "Energy\t"     << param.E_() << "\n" */
+	/* 	  "U or F vector\t " << "\n"; */
+	/* os.precision(3); */
+	/* for (int i = 0; i < ElasticState::e_size; i++) */
+	/* { */
+	/* 	os << setw(5) << " |" << setw(5) << param[i]; */
+	/* } */	
+	/* os << setw(5) << " | "; */
+	/* return os; */
+	/* } */
+
+/* const string name[] = {"rhou_1", "rhou_2", "rhou_3", "rhoF_11", "rhoF_12", "rhoF_13", "rhoF_21", "rhoF_22", "rhoF_23", "rho_31", "rho_32", "rho_33", "rhoE"}; */
+	
+	cout.precision(4);
+	/* for(int i = 0; i < ElasticState::e_size; i++) */
+	/* { */
+	/* 	cout << setw(3) << " |" << setw(7) << name[i]; */
+	/* } */
+	/* cout << setw(7) <<  " |" << endl; */
+	for(int i = 0; i < 140; i++)
+	{
+		cout << '-';
+	}
+	cout << endl;
+	for(int i = 0; i < mat.dom.GNi; i++)
+	{
+		cout << setw(7) << left << i << ' ' << mat.sol[i] << endl;
+	}
+}
+/* //equation of state parameters */
+/* //--sound speed */	
+/* double K_0; */
+/* //--shear wave speed */
+/* double b_0, B_0; */
+/* //--Heat capacity at constant volume */
+/* double c_v; */
+/* //--non-linear dependence of K_0 and T on mass density */
+/* double alpha, beta, gamma; */ 
+/* //--Temperature */
+/* double T_0; */
+
+enum ICType { Barton1, Barton2, Barton3, Barton4 };
+
+ICType icType;
+enum slope_lim{superbee, minbee, van_leer, albalda};//0,1,2,3
+
+slope_lim sl;
+void setBCs(Material& mat)
+{
+	// config read
+	for (int i = 0; i < mat.dom.GC; i++)
+	{
+		mat.sol[i] = mat.sol[2*mat.dom.GC - i - 1];
+		mat.sol[mat.dom.Ni+  i + mat.dom.GC] = mat.sol[mat.dom.GNi - mat.dom.GC - i - 1]; 
+	}					
+}	
+/* void initialize(InputSolid inputSolid, Material* mat) */
+/* { */
+/* 	/1* ElasticState flux = ElasticStateL.flux(); *1/ */
+/* } */
+void printArray(Material mat)
+{
+	/* inline std::ostream& operator<<(std::ostream& os, ElasticState& param) */
+	/* { */
+	/* param.initialStates(os); */
+	/* os << "Current states \n" << */
+	/* 	  "Density\t"    << param.rho_() << "\n" */
+	/* 	  "Energy\t"     << param.E_() << "\n" */
+	/* 	  "U or F vector\t " << "\n"; */
+	/* os.precision(3); */
+	/* for (int i = 0; i < ElasticState::e_size; i++) */
+	/* { */
+	/* 	os << setw(5) << " |" << setw(5) << param[i]; */
+	/* } */	
+	/* os << setw(5) << " | "; */
+	/* return os; */
+	/* } */
+
+/* const string name[] = {"rhou_1", "rhou_2", "rhou_3", "rhoF_11", "rhoF_12", "rhoF_13", "rhoF_21", "rhoF_22", "rhoF_23", "rho_31", "rho_32", "rho_33", "rhoE"}; */
+	
+	cout.precision(4);
+	/* for(int i = 0; i < ElasticState::e_size; i++) */
+	/* { */
+	/* 	cout << setw(3) << " |" << setw(7) << name[i]; */
+	/* } */
+	/* cout << setw(7) <<  " |" << endl; */
+	for(int i = 0; i < 140; i++)
+	{
+		cout << '-';
+	}
+	cout << endl;
+	for(int i = 0; i < mat.dom.GNi; i++)
+	{
+		cout << setw(7) << left << i << ' ' << mat.sol[i] << endl;
+	}
+}
+
