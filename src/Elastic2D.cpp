@@ -118,6 +118,8 @@ void solveXGodunov(Material& mat, const double dt)
 	BCs(mat);
 }
 
+
+
 ElasticState forceFlux(System& sys, vector<ElasticState>& left, vector<ElasticState>& right, double dt_dX, int i)
 {
 	const ElasticState F_lf = 0.5*(sys.flux(right[i]) + sys.flux(left[i+1])) + (0.5/dt_dX)*(right[i]-left[i+1]);
@@ -535,7 +537,7 @@ void solveXPPM(Material& mat, const double dt) //evolve function
   
 }
 
-void solveXSLIC(Material& mat, const double dt)
+void solveXSLIC2D(Material& mat, const double dt)
 {
 	int N = mat.dom.GNi;
 	vector<ElasticState> left(N);
