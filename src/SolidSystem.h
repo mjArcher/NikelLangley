@@ -84,11 +84,11 @@ class System {
 		//! Vector of invariants computed from finger tensor
     Eigen::Vector3d getInvariants(const Eigen::Matrix3d& F) const;
 
-    ElasticState flux(const ElasticPrimState&) const;
+    ElasticState flux(const ElasticPrimState&, const int dirn) const;
 
-		ElasticState flux(const ElasticState&) const;
+		ElasticState flux(const ElasticState&, const int dirn) const;
 		
-    ElasticState flux(const ElasticState& consState, const ElasticPrimState& primState) const;
+    ElasticState flux(const ElasticState& consState, const ElasticPrimState& primState, const int dirn) const;
 
 		//! Symmetric matrix of stresses.
 		Eigen::Matrix3d stress(const ElasticPrimState&) const;

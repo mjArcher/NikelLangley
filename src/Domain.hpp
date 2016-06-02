@@ -4,29 +4,36 @@
 #include <vector>
 #include <iostream>
 
-class Domain2D {
+//throw error if dx /= dy
+class Domain {
   public:
     Domain(); 
-    Domain(int rows, int cols); 
-    int getRows(){return rows;};
-    int getCols(){return cols;};
-    std::vector<std::vector<double> > returnDomain(){return dom;};
+    Domain(int rows, int cols, int GC, double Lx); 
+
+    //number of cells excluding ghost cells 
+    int getRows(){return Nx;};
+    int getCols(){return Ny;};
+    std::vector<std::vector<double> > returnDomain() {return dom;};
+
+    int starti, endi;
+    double Lx, Ly, dx;
+    
 
     double operator() (unsigned int row, unsigned int col) const;
-    
-    
 
   private:
     std::vector<std::vector<double> > dom;
-    int rows;
-    int cols;
-    int gCs;
-  //declare operators
+    int GC;
+    int Nx, Ny;
+
+    //solve once then take the transpose, dirn for the type of flux computed 
+    //declare operators
   
     //get row, get col?
     //assign row, assign col.
-
   
 };
 
 #endif
+
+

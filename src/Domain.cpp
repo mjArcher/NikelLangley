@@ -18,10 +18,9 @@ using namespace std;
 //currently have a Material class which has vectors of ElasticStates
 //could eventually have a material class which has also a mask - boolean array (indicates where on the domain the material is)
 //might be quite tricky: since we have states wrapped up in material structs.
-//
-
-Domain::Domain2D(int rows, int cols):rows(rows),cols(cols){ 
-  vector<vector<double> > A(rows, vector<double>(cols));
+//we can get the y-length from the ratio between the number of x and y cells - always assume square cells!
+Domain::Domain2D(int Nx, int Ny, int GC, double Lx ):Nx(Nx), Ny(Ny), GC(GC), Lx(Lx) { 
+  vector<vector<double> > A(Ny, vector<double>(Nx));
   dom = A;
 }
 

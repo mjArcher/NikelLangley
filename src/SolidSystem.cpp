@@ -81,17 +81,18 @@ Vector3d System::getInvariants(const Matrix3d& F) const
 	return I;
 }
 
-ElasticState System::flux(const ElasticPrimState& primState) const 
+ElasticState System::flux(const ElasticPrimState& primState, const int dirn) const 
 {
-  return flux(primitiveToConservative(primState), primState);
+  return flux(primitiveToConservative(primState), primState, dirn);
 }
 
-ElasticState System::flux(const ElasticState& consState) const
+ElasticState System::flux(const ElasticState& consStatem const int dirn) const
 {
-	return flux(consState, conservativeToPrimitive(consState));
+	return flux(consState, conservativeToPrimitive(consState), dirn);
 }
 
-ElasticState System::flux(const ElasticState& consState, const ElasticPrimState& primState) const
+//need to implement multi-dimensional flux
+ElasticState System::flux(const ElasticState& consState, const ElasticPrimState& primState, const int dirn) const
 {
 	ElasticState Fl; //flux
 	Matrix3d rhoF = consState.rhoF();	
@@ -102,19 +103,19 @@ ElasticState System::flux(const ElasticState& consState, const ElasticPrimState&
 	//but we can use both the primitive state and conservative state to compute the flux
 	// write for loops here instead
 
-	Fl[0]  = m(0)*u(0) - sigma(0,0);
-	Fl[1]  = m(1)*u(0) - sigma(0,1);
-	Fl[2]  = m(2)*u(0) - sigma(0,2);
-	Fl[3]  = 0; 
-	Fl[4]  = 0; 
-	Fl[5]  = 0; 
-	Fl[6]  = rhoF(1,0)*u(0) - rhoF(0,0)*u(1);
-	Fl[7]  = rhoF(1,1)*u(0) - rhoF(0,1)*u(1);
-	Fl[8]  = rhoF(1,2)*u(0) - rhoF(0,2)*u(1);
-	Fl[9]  = rhoF(2,0)*u(0) - rhoF(0,0)*u(2);
-	Fl[10] = rhoF(2,1)*u(0) - rhoF(0,1)*u(2);
-	Fl[11] = rhoF(2,2)*u(0) - rhoF(0,2)*u(2);
-	Fl[12] = rhoE*u(0) - u(0)*sigma(0,0)-u(1)*sigma(0,1)-u(2)*sigma(0,2);
+	Fl[0]  = m(0)*u(dirn) - sigma(dirn,0);
+	Fl[1]  = m(1)*u(dirn) - sigma(dirn,1);
+	Fl[2]  = m(2)*u(dirn) - sigma(dirn,2);
+	Fl[3]  = rhoF(0,0)*u(dirn) - rhoF(dirn,0)*u(0);
+	Fl[4]  = rhoF(0,1)*u(dirn) - rhoF(dirn,1)*u(0);
+	Fl[5]  = rhoF(0,2)*u(dirn) - rhoF(dirn,2)*u(0);
+	Fl[6]  = rhoF(1,0)*u(dirn) - rhoF(dirn,0)*u(1);
+	Fl[7]  = rhoF(1,1)*u(dirn) - rhoF(dirn,1)*u(1);
+	Fl[8]  = rhoF(1,2)*u(dirn) - rhoF(dirn,2)*u(1);
+	Fl[9]  = rhoF(2,0)*u(dirn) - rhoF(dirn,0)*u(2);
+	Fl[10] = rhoF(2,1)*u(dirn) - rhoF(dirn,1)*u(2);
+	Fl[11] = rhoF(2,2)*u(dirn) - rhoF(dirn,2)*u(2);
+	Fl[12] = rhoE*u(dirn) - u(0)*sigma(dirn,0)-u(1)*sigma(dirn,1)-u(2)*sigma(dirn,2);
 	return Fl;
 
 	/* Fl[0]  = v[0]*u[0] - sigma(0,0); */
