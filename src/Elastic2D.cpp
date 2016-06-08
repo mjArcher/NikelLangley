@@ -10,6 +10,7 @@
 #include "ElasticPrimState.h"
 #include "SolidSystem.h"
 #include "InputSolid.h"
+#include "Domain.hpp"
 
 using namespace std;
 using namespace libconfig;
@@ -27,26 +28,25 @@ using namespace Eigen;
 enum slope_lim{superbee, minbee, vanleer, albalda};//0,1,2,3
 slope_lim sl;
 
-struct Domain {
-	int Ni; //number of x cells
-	int GNi; // number of x cells plus ghost cells
-	int GC; // number of ghost cells
-	int starti; //start of domain
-	int endi; //end of domain
-	double Lx; // length of domain
-	double dx; // cell size
+/* struct Domain { */
+/* 	int Ni; //number of x cells */
+/* 	int GNi; // number of x cells plus ghost cells */
+/* 	int GC; // number of ghost cells */
+/* 	int starti; //start of domain */
+/* 	int endi; //end of domain */
+/* 	double Lx; // length of domain */
+/* 	double dx; // cell size */
 
-	Domain(const int a_Ni, const int a_GC, const double a_Lx) :
-		Ni(a_Ni), GNi(a_Ni+2*a_GC), GC(a_GC),	starti(a_GC), endi(a_Ni+a_GC),
-		Lx(a_Lx), dx(a_Lx/a_Ni){}
-  Domain(){}
-	~Domain(){
-	}
-};
+/* 	Domain(const int a_Ni, const int a_GC, const double a_Lx) : */
+/* 		Ni(a_Ni), GNi(a_Ni+2*a_GC), GC(a_GC),	starti(a_GC), endi(a_Ni+a_GC), */
+/* 		Lx(a_Lx), dx(a_Lx/a_Ni){} */
+/*   Domain(){} */
+/* 	~Domain(){ */
+/* 	} */
+/* }; */
 
 struct Material {
   const System sys;
-  vector<ElasticState> sol;  
   const Domain dom;
   string name;
 
@@ -59,7 +59,6 @@ double slopelim(double);
 double ksi_r(double);
 ElasticState grad(const Material&, int);
 void outputAll(string, const vector<ElasticState>);
-
 //ppm functions
 ElasticState theta(const Material& mat, int j);
 

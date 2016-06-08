@@ -17,12 +17,11 @@ ElasticPrimState::ElasticPrimState(Vector3d u, Matrix3d F, double S)
 }
 
 // default constructor
-
-ElasticPrimState::ElasticPrimState(){
+ElasticPrimState::ElasticPrimState(int temp){
 	v = VectorXd::Zero(ElasticPrimState::e_size);
 }
 
-ElasticPrimState::ElasticPrimState(int temp){
+ElasticPrimState::ElasticPrimState(){
 	v = VectorXd::Zero(ElasticPrimState::e_size);
 }
 

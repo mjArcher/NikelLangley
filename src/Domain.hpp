@@ -5,26 +5,42 @@
 #include <iostream>
 
 //throw error if dx /= dy
+//
+//i = y
+//j = x
 class Domain {
   public:
     Domain(); 
+    ~Domain();
     Domain(int rows, int cols, int GC, double Lx); 
 
-    //number of cells excluding ghost cells 
-    int getRows(){return Nx;};
-    int getCols(){return Ny;};
+    int getNi(){return Ni;}; //computational rows
+    int getNj(){return Nj;};
     std::vector<std::vector<double> > returnDomain() {return dom;};
-
-    int starti, endi;
-    double Lx, Ly, dx;
     
+    double operator() (unsigned int i, unsigned int j) const;
 
-    double operator() (unsigned int row, unsigned int col) const;
+    //return row/column + ghost cells
+    std::vector<double> getGRowi(int) const; // get the row in the ith direction
+    std::vector<double> getGColj(int) const; //
+    //return row/column
+    std::vector<double> getRowi(int) const; //row 
+    std::vector<double> getColj(int) const; //col
+    int GCs(){return GC;};
+
+    int starti, startj, endi, endj;
+    int GNi, GNj;
+    double getPoint(int, int); //return the point indexed by i and j
+
+    friend std::ostream& operator<<(std::ostream&, const std::vector<double>&);
 
   private:
     std::vector<std::vector<double> > dom;
     int GC;
-    int Nx, Ny;
+    int Ni, Nj;
+    //physical domain lengths and widths
+    double Ly, Lx, dx;
+    
 
     //solve once then take the transpose, dirn for the type of flux computed 
     //declare operators

@@ -1,0 +1,7 @@
+This is a test of the domain class using eigen (or any suitable library) or even your own class. 
+
+
+Eigen
+want to easily extract a block from the 2D array defined by eigen
+
+output to hdf
