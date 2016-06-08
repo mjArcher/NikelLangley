@@ -8,7 +8,11 @@
 //
 //i = y
 //j = x
-class Domain {
+//see https://isocpp.org/wiki/faq/templates
+template <typename T> class Domain;
+template <typename T> std::ostream& operator<< (std::ostream&, const std::vector<T>&);
+
+template <class T> class Domain {
   public:
     Domain(); 
     ~Domain();
@@ -16,35 +20,33 @@ class Domain {
 
     int getNi(){return Ni;}; //computational rows
     int getNj(){return Nj;};
-    std::vector<std::vector<double> > returnDomain() {return dom;};
+    std::vector<std::vector<T> > returnDomain() {return dom;};
     
-    double operator() (unsigned int i, unsigned int j) const;
+    T operator() (unsigned int i, unsigned int j) const;
 
     //return row/column + ghost cells
-    std::vector<double> getGRowi(int) const; // get the row in the ith direction
-    std::vector<double> getGColj(int) const; //
+    std::vector<T> getGRowi(int) const; // get the row in the ith direction
+    std::vector<T> getGColj(int) const; //
     //return row/column
-    std::vector<double> getRowi(int) const; //row 
-    std::vector<double> getColj(int) const; //col
+    std::vector<T> getRowi(int) const; //row 
+    std::vector<T> getColj(int) const; //col
     int GCs(){return GC;};
 
     int starti, startj, endi, endj;
     int GNi, GNj;
-    double getPoint(int, int); //return the point indexed by i and j
+    T getCellCartPos(int, int); //return the physical location of point indexed by cell centre i and j
 
-    friend std::ostream& operator<<(std::ostream&, const std::vector<double>&);
+    friend std::ostream& operator<< <>(std::ostream&, const std::vector<T>&);
 
   private:
-    std::vector<std::vector<double> > dom;
+    std::vector<std::vector<T> > dom;
     int GC;
     int Ni, Nj;
     //physical domain lengths and widths
     double Ly, Lx, dx;
     
-
     //solve once then take the transpose, dirn for the type of flux computed 
     //declare operators
-  
     //get row, get col?
     //assign row, assign col.
   
