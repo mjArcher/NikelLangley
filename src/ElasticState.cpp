@@ -134,6 +134,23 @@ ElasticState operator/(const ElasticState& lhs, const double& s)
   return lhs*(1.0/s);
 }
 
+bool operator==(const ElasticState& p1, const ElasticState& p2) 
+{
+  VectorXd v1 = p1.getStateVector();
+  VectorXd v2 = p2.getStateVector();
+  /* std::cout << v1.isApprox(v2) << std::endl; */
+  /* std::cout.precision(15); */
+  /* std::cout << v1 << " " << v2 << std::endl; */
+  return v1.isApprox(v2, 1e-10);
+  /* std::cout << p1.S_() << " " << p2.S_() << std::endl; */
+  /* return p1.u_().isApprox(p2.u_())&&p1.F_().isApprox(p2.F_())&&p1.S_().isApprox(p2.S_()); */
+}
+
+bool operator!=(const ElasticState& p1, const ElasticState& p2)
+{
+  return !(p1==p2);
+}
+
 
 /* class X { */
 /*   X& operator+=(const X& rhs) */

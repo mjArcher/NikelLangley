@@ -103,7 +103,7 @@ class System {
 		//! Compute the acoustic tensor 
 		Eigen::Matrix3d AcousticTensor(const ElasticPrimState& pri, const int dirn) const;
 
-    ElasticState godunovFlux(const ElasticState& qL, const ElasticState& qR) const;
+    ElasticState godunovFlux(const ElasticState& qL, const ElasticState& qR, const int dirn) const;
     
     Eigen::Vector3d B(const ElasticPrimState&) const;
 
@@ -167,3 +167,4 @@ class System {
 
 };
 #endif
+

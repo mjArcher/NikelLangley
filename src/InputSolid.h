@@ -78,9 +78,14 @@ class InputSolid{
       xMin = 0.f;
       xMax = 1.f;
 
-      cellCountX = 100;
+      yMin = 0.f;
+      yMax = 1.f;
 
-      deltaX = 1.0/200;    
+      cellCountX = 100;
+      cellCountY = 100;
+
+      deltaX = 1.0/cellCountX;    
+      deltaY = 1.0/cellCountY;    
 
       end_time = 0.0;
       start_output = false;
@@ -126,9 +131,13 @@ class InputSolid{
 
         // get domain information 
         cellCountX = simulation["domain"]["cells"]["x"];
+        cellCountY = simulation["domain"]["cells"]["x"];
 
         xMin = simulation["domain"]["dimensions"]["x"][0];
         xMax = simulation["domain"]["dimensions"]["x"][1];
+
+        yMin = simulation["domain"]["dimensions"]["y"][0];
+        yMax = simulation["domain"]["dimensions"]["y"][1];
 
         //get boundary information
 
@@ -136,6 +145,8 @@ class InputSolid{
           Setting& space = simulation["space"];
           if(std::string(space.c_str()) == "cartesian"){
             cartesian = true;
+            curvilinear = false;
+            cut_cell = false;
           }
           if(std::string(space.c_str()) == "curvilinear"){
             curvilinear = true;

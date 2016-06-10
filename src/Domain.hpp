@@ -9,6 +9,7 @@
 //i = y
 //j = x
 //see https://isocpp.org/wiki/faq/templates
+//http://stackoverflow.com/questions/6969881/operator-overload
 template <typename T> class Domain;
 template <typename T> std::ostream& operator<< (std::ostream&, const std::vector<T>&);
 
@@ -30,11 +31,21 @@ template <class T> class Domain {
     //return row/column
     std::vector<T> getRowi(int) const; //row 
     std::vector<T> getColj(int) const; //col
+    //assign row/col functions
+    /* void assignRowi(int); */
+    /* void assignColj(int); */
+
     int GCs(){return GC;};
 
     int starti, startj, endi, endj;
     int GNi, GNj;
-    T getCellCartPos(int, int); //return the physical location of point indexed by cell centre i and j
+    T getCellCartPos(unsigned int, unsigned int); //return the physical location of point indexed by cell centre i and j
+
+    //overload operators 
+
+    //this needs some thought:
+    std::vector<T> operator[](int i);
+    /* const std::vector<T> operator[](int i); */
 
     friend std::ostream& operator<< <>(std::ostream&, const std::vector<T>&);
 

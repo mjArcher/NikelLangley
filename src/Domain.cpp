@@ -81,11 +81,31 @@ vector<T> Domain<T>::getGColj(int col) const
   return colv;
 }
 
+
+/* template <class T> */
+/* void Domain<T>::assignRowi(unsigned int rowi, vector<T> row) */ 
+/* { */
+/*   for(int j = 0; j < GNj; j++) */
+/*   { */
+/*     dom[rowi][j] = row[j]; */
+/*   } */
+/* } */
+
+/* template <class T> */
+/* void Domain<T>::assignColj(unsigned int colj, vector<T> col) */ 
+/* { */
+/*   for(int i = 0; i < GNi; i++) */
+/*   { */
+/*     dom[i][colj] = col[i]; */
+/*   } */
+/* } */
+
 template <class T>
-T Domain<T>::operator() (unsigned int row, unsigned int col) const
+T Domain<T>::operator()(unsigned int row, unsigned int col) const
 {
   return dom[row][col];
 }
+
 
 //get the cartesian position indexed by row and col
 //think about what output this should be i.e. a map? tuple?
@@ -107,12 +127,13 @@ std::ostream& operator<<(std::ostream& os, const vector<T>& param)
   return os;
 }
 
-int main(int argc, char ** argv)
-{
-  Domain<ElasticPrimState> dom(10, 40, 2, 1.0);
-  cout << dom.getNi() << endl;
-  printf("\nGet element from the array\n");
-  cout << dom.returnDomain()[5][20] << endl;
-  cout << "output col to screen" << endl;
-}
+/* int main(int argc, char ** argv) */
+/* { */
+/*   Domain<ElasticPrimState> dom(10, 40, 2, 1.0); */
+/*   cout << dom.getNi() << endl; */
+/*   printf("\nGet element from the array\n"); */
+/*   cout << dom.returnDomain()[5][20] << endl; */
+/*   cout << "output col to screen" << endl; */
+/*   //use more sophisticated getter */
+/* } */
 

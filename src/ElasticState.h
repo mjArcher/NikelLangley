@@ -66,6 +66,10 @@ class ElasticState
 
 		ElasticState operator/(const ElasticState& lhs, const double& s);
 
+    bool operator==(const ElasticState& lhs, const ElasticState& rhs);
+
+    bool operator!=(const ElasticState& lhs, const ElasticState& rhs);
+
 /* inline ElasticState::ElasticState(Eigen::Vector3d u_i, Eigen::Matrix3d F_i, double rho_i, double S_0, double e_0):rho_0(rho_i), S(S_0) */
 /* { */
 /* 	u_0 = u_i; */

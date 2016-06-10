@@ -86,7 +86,7 @@ ElasticState System::flux(const ElasticPrimState& primState, const int dirn) con
   return flux(primitiveToConservative(primState), primState, dirn);
 }
 
-ElasticState System::flux(const ElasticState& consStatem const int dirn) const
+ElasticState System::flux(const ElasticState& consState, const int dirn) const
 {
 	return flux(consState, conservativeToPrimitive(consState), dirn);
 }
@@ -210,6 +210,7 @@ vector<Matrix3d> System::dep_dF(const SquareTensor3 dI_dF, const Matrix3d depsi_
 
 double System::getMaxWaveSpeed(const ElasticPrimState& prim, const int dirn) const
 {
+  //not yet implemented!
   //can do this a number of ways
   //we can take the eigenvalues from decomposition of A (this means performing the expensive decomposition again)
   //or we could decompose the acoustic tensor - this would be be more efficient
@@ -511,9 +512,9 @@ VectorXd System::stateEigenDecompose_Omega(const ElasticPrimState& pW,
   return temp;
 }
 
-ElasticState System::godunovFlux(const ElasticState& qL, const ElasticState& qR) const
+ElasticState System::godunovFlux(const ElasticState& qL, const ElasticState& qR, const int dirn) const
 {
-  return flux(godunovState(conservativeToPrimitive(qL), conservativeToPrimitive(qR), 0)); //add dirn to this 
+  return flux(godunovState(conservativeToPrimitive(qL), conservativeToPrimitive(qR), dirn), dirn); //add dirn to this 
 }
 
 ElasticPrimState System::godunovState(const ElasticPrimState& pL, const ElasticPrimState& pR, const int dirn) const

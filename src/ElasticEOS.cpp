@@ -10,6 +10,8 @@ ElasticEOS::ElasticEOS(const string& mat)
 {
 	double c0, b0;
 
+  cout << "Material = " << mat << endl;
+
 	if(mat == "copper")
 	{
 		rho0 = 8930.;

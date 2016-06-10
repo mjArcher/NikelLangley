@@ -10,7 +10,8 @@
 #include "ElasticPrimState.h"
 #include "SolidSystem.h"
 #include "InputSolid.h"
-#include "Domain.hpp"
+#include "Utils.h"
+/* #include "Domain.hpp" */
 
 using namespace std;
 using namespace libconfig;
@@ -28,59 +29,89 @@ using namespace Eigen;
 enum slope_lim{superbee, minbee, vanleer, albalda};//0,1,2,3
 slope_lim sl;
 
-/* struct Domain { */
-/* 	int Ni; //number of x cells */
-/* 	int GNi; // number of x cells plus ghost cells */
-/* 	int GC; // number of ghost cells */
-/* 	int starti; //start of domain */
-/* 	int endi; //end of domain */
-/* 	double Lx; // length of domain */
-/* 	double dx; // cell size */
+typedef Eigen::Matrix<ElasticPrimState, Eigen::Dynamic, Eigen::Dynamic> SolnArryPrim;
+typedef Eigen::Matrix<ElasticState, Eigen::Dynamic, Eigen::Dynamic> SolnArry;
 
-/* 	Domain(const int a_Ni, const int a_GC, const double a_Lx) : */
-/* 		Ni(a_Ni), GNi(a_Ni+2*a_GC), GC(a_GC),	starti(a_GC), endi(a_Ni+a_GC), */
-/* 		Lx(a_Lx), dx(a_Lx/a_Ni){} */
-/*   Domain(){} */
-/* 	~Domain(){ */
-/* 	} */
-/* }; */
+struct Domain {
+	int Ni; //number of y cells
+	int GNi; // number of y cells plus ghost cells
+	int Nj; //number of x cells
+	int GNj; // number of x cells plus ghost cells
+	int GC; // number of ghost cells
+	int starti; //start of domain
+	int endi; //end of domain
+	int startj; //start of domain
+	int endj; //end of domain
+	double Lx; // length of domain
+	double Ly; // length of domain
+	double dx; // cell size
+	double dy; // cell size
+
+  Domain(const int a_Ni, const int a_Nj, const int a_GC,
+      const double a_Lx) :
+    Ni(a_Ni), Nj(a_Nj), GNi(a_Ni+2*a_GC), GNj(a_Nj+2*a_GC), GC(a_GC),
+    starti(a_GC), startj(a_GC), endi(a_Ni+a_GC), endj(a_Nj+a_GC), 
+    Lx(a_Lx), Ly((a_Lx*a_Nj)/a_Ni), dx(a_Lx/a_Ni), dy(a_Lx/a_Ni) {}
+  Domain(){}
+	~Domain(){
+	}
+};
 
 struct Material {
   const System sys;
-  const Domain dom;
+  /* const Domain<ElasticState> dom; */
+  Domain dom;
+  SolnArry sol;
   string name;
 
-  Material(const string& a_name, const Domain& a_dom, const ElasticEOS Eos) :
-    sys(Eos), 
-    sol(a_dom.GNi), dom(a_dom), name(a_name) {}
+  Material(const string& a_name, const Domain a_dom, const ElasticEOS Eos):
+    sys(Eos), dom(a_dom), sol(a_dom.GNi, a_dom.GNj), name(a_name) {}
 };
 
 double slopelim(double);
 double ksi_r(double);
-ElasticState grad(const Material&, int);
-void outputAll(string, const vector<ElasticState>);
-//ppm functions
-ElasticState theta(const Material& mat, int j);
+ElasticState grad(const ElasticState, const ElasticState, const ElasticState);
+/* void outputAll(string, const ); */
 
 void BCs(Material& mat) {  
-
-//transmissive boundary conditions 
-//start
+  //transmissive boundary conditions 
+  //apply boundary conditions row wise first 
+  for(int j=mat.dom.startj; j<mat.dom.endj; ++j){
+    //start
 #pragma omp parallel for schedule(dynamic)
-  for(int i=0; i<mat.dom.starti; ++i) {
-    const int imagei = 2*mat.dom.starti-1-i;
-    mat.sol[i] = mat.sol[imagei];
+    for(int i=0; i<mat.dom.starti; ++i) {
+      const int imagei = 2*mat.dom.starti-1-i;
+      mat.sol(i,j) = mat.sol(imagei,j);
+    }
+
+    //end
+#pragma omp parallel for schedule(dynamic)
+    for(int i=mat.dom.endi; i<mat.dom.GNi; ++i) {
+      const int imagei = 2*mat.dom.endi-1-i;
+      mat.sol(i,j) = mat.sol(imagei,j);
+    }  
   }
 
-//end
+  //loop over rows
+  for(int i=mat.dom.starti; i<mat.dom.endi; ++i){
+    //start
 #pragma omp parallel for schedule(dynamic)
-  for(int i=mat.dom.endi; i<mat.dom.GNi; ++i) {
-    const int imagei = 2*mat.dom.endi-1-i;
-    mat.sol[i] = mat.sol[imagei];
-  }  
+    for(int j=0; j<mat.dom.startj; ++j) {
+      const int imagej = 2*mat.dom.startj-1-j;
+      mat.sol(i,j) = mat.sol(i,imagej);
+    }
+
+    //end
+#pragma omp parallel for schedule(dynamic)
+    for(int j=mat.dom.endj; j<mat.dom.GNj; ++j) {
+      const int imagej = 2*mat.dom.endj-1-j;
+      mat.sol(i,j) = mat.sol(i,imagej);
+    }  
+  }
 }
 
-void ICInterface(Material& mat,
+//rotate states
+void ICRiemann2DTrivial(Material& mat,
     const double iface,
     const ElasticPrimState& left, const ElasticPrimState& right) 
 {
@@ -88,233 +119,77 @@ void ICInterface(Material& mat,
   ElasticState stateL = mat.sys.primitiveToConservative(left);
   ElasticState stateR = mat.sys.primitiveToConservative(right);
 
+
+  //trivial Riemann problem
   for(int i=mat.dom.starti; i<mat.dom.endi; ++i) {
-    const double x = (i-mat.dom.starti+0.5)*mat.dom.dx;
-    if(x<iface) 
-    {      
-      mat.sol[i] = stateL;
+    for(int j=mat.dom.startj; j<mat.dom.endj; ++j) {
+      const double x = (j-mat.dom.startj+0.5)*mat.dom.dx;
+      if(x<iface) 
+      {      
+        mat.sol(i,j) = stateL;
+      }
+      else 
+      {
+        mat.sol(i,j) = stateR;
+      } 
     }
-    else 
-    {
-      mat.sol[i] = stateR;
-    } 
   }
+  cout << "Initialised 2D domain " << endl;
+}
+
+//45 degree angle
+void ICRiemann2D(Material& mat,
+    const ElasticPrimState& left, const ElasticPrimState& right) 
+{
+  //convert to conserved states
+  ElasticState stateL = mat.sys.primitiveToConservative(left);
+  ElasticState stateR = mat.sys.primitiveToConservative(right);
+
+  cout << mat.sys.Density(left) << endl;
+
+  cout << mat.sys.Density(right) << endl;
+
+  double iface = 0;
+  //trivial Riemann problem
+  for(int i=mat.dom.starti; i<mat.dom.endi; ++i) {
+    for(int j=mat.dom.startj; j<mat.dom.endj; ++j) {
+      const double x = (j-mat.dom.startj+0.5)*mat.dom.dx;
+      if(i<=mat.dom.endj - j) 
+      {      
+        mat.sol(i,j) = stateL;
+      }
+      else 
+      {
+        mat.sol(i,j) = stateR;
+      } 
+    }
+  }
+  cout << "Initialised 2D domain " << endl;
 }
 
 //supply left state 
 //this will affect the calculation of the timestep
-void solveXGodunov(Material& mat, const double dt)
+/* void solveXGodunov(Material& mat, const double dt) */
+/* { */
+/* 	const double dt_dX = dt/mat.dom.dx; */
+/*   const vector<ElasticState> soln = mat.sol; */
+/*   #pragma omp parallel for schedule(dynamic) */
+/* 	for(int i = mat.dom.starti - 1; i < mat.dom.endi + 1; i++) */
+/* 	{ */
+/* 	  mat.sol[i] += dt_dX*(mat.sys.godunovFlux(soln[i-1], soln[i]) - mat.sys.godunovFlux(soln[i], soln[i+1])); */
+/* 	} */
+/*   /1* exit(1); *1/ */
+/* 	//printArray(U); */
+/* 	BCs(mat); */
+/* } */
+
+ElasticState forceFlux(System& sys, vector<ElasticState>& left, vector<ElasticState>& right, double dt_dX, int i,  const int dirn)
 {
-	const double dt_dX = dt/mat.dom.dx;
-  const vector<ElasticState> soln = mat.sol;
-  #pragma omp parallel for schedule(dynamic)
-	for(int i = mat.dom.starti - 1; i < mat.dom.endi + 1; i++)
-	{
-	  mat.sol[i] += dt_dX*(mat.sys.godunovFlux(soln[i-1], soln[i]) - mat.sys.godunovFlux(soln[i], soln[i+1]));
-	}
-  /* exit(1); */
-	//printArray(U);
-	BCs(mat);
-}
-
-
-
-ElasticState forceFlux(System& sys, vector<ElasticState>& left, vector<ElasticState>& right, double dt_dX, int i)
-{
-	const ElasticState F_lf = 0.5*(sys.flux(right[i]) + sys.flux(left[i+1])) + (0.5/dt_dX)*(right[i]-left[i+1]);
-	const ElasticState C_r = 0.5*(right[i] + left[i+1]) + 0.5*(dt_dX)*(sys.flux(right[i]) - sys.flux(left[i+1]));
-	ElasticState F_force = 0.5*(F_lf + sys.flux(C_r));
+	const ElasticState F_lf = 0.5*(sys.flux(right[i], dirn) + sys.flux(left[i+1], dirn)) + (0.5/dt_dX)*(right[i]-left[i+1]);
+	const ElasticState C_r = 0.5*(right[i] + left[i+1]) + 0.5*(dt_dX)*(sys.flux(right[i], dirn) - sys.flux(left[i+1], dirn));
+	ElasticState F_force = 0.5*(F_lf + sys.flux(C_r, dirn));
 	return F_force;
 }
-
-double alpha_r(double d_r, double beta_r)
-{
-  double denom = pow(1e-6+beta_r, 2);
-  return d_r/denom;
-}
-
-vector<ElasticState> beta(vector<ElasticState>& soln, int k, int i)
-{
-  //j should never change here
-  // repeatedly calculating at least the denominator?
-  // think this could be vectorised and stored 
-  vector<ElasticState> b(k);
-  for(unsigned int j = 0; j < ElasticState::e_size; j++)
-  {
-    b[0][j] = 13./12.*pow((soln[i][j] -   2.*soln[i+1][j] + soln[i+2][j]), 2.) + 1./4.*pow((3.*soln[i][j] - 4.*soln[i+1][j] + soln[i+2][j]), 2);
-    b[1][j] = 13./12.*pow((soln[i-1][j] - 2.*soln[i][j]   + soln[i+1][j]), 2.) + 1./4.*pow(( soln[i-1][j] +    soln[i+1][j]), 2.);
-    b[2][j] = 13./12.*pow((soln[i-2][j] - 2.*soln[i-1][j] + soln[i][j]), 2.)   + 1./4.*pow(( soln[i-2][j] - 4.*soln[i-1][j] + 3.*soln[i][j]), 2);
-  }
-  return b;
-}
-
-vector<ElasticState> omega(Material& mat, vector<ElasticState> vr, int soln_ind, bool right)
-{
-  const double d[3] = {3./10., 3./5., 1./10.}; // and dbar_r = d_{k-1-r}
-  int k = vr.size();
-  vector<ElasticState> w(k);  // r .. k
-  double d_r;
-  //find smoothness indicators for all r = 0,...,k-1 before looping over all states? This can be vectorised.
-  //3xElasticState
-  vector<ElasticState> beta_r = beta(mat.sol, w.size(), soln_ind); // store 1, 2 and 3.
-
-  for(unsigned int r = 0; r < vr.size(); r++)
-  {
-    // if statement on right boolean
-    if(right)
-      d_r = d[r];
-    else
-      d_r = d[k-1-r];
-
-    for(unsigned int j = 0; j < ElasticState::e_size; j++)
-    {
-      double alpha_den;
-      double d_s;
-      for (int s = 0; s < k; s++)
-      {
-        if(right)
-          d_s = d[s];
-        else
-          d_s = d[k-1-s];
-
-        alpha_den += alpha_r(d[s], beta_r[s][j]); // right or left?
-        w[r][j] = alpha_r(d_r, beta_r[r][j])/alpha_den;
-      }
-    }
-  }
-  return w;
-}
-
-ElasticState WENO_recon(Material& mat, int i, bool right)
-{
-  const int r = 4, j = 3; // r = -1, 0, 1, 2 :: j = 0, 1, 2, 3
-  const double C[r][j] = {
-    {11./6., -7./6.,  1./3.} , 
-    { 1./3.,  5./6., -1./6.} ,
-    {-1./6.,  5./6.,  1./3.} ,
-    { 1./3., -7./6., 11./6.} ,
-  };
-  ElasticState weno;
-
-  unsigned short int k = 3;
-  vector<ElasticState> vr(k);
-  vector<ElasticState> q = mat.sol;
-
-  unsigned short int Crinc(0);
-  if(right)
-   Crinc = 1; 
-
-  //(2k - 1) order k = 3 :: 5th order 
-  for(unsigned int r = 0; r < k; r++) // r is the row 0 ... k - 1
-  {
-    for(unsigned int j = 0; j < k; j++)
-    {
-      //k different reconstructions of v+-1/2
-      vr[r] += C[r + Crinc][j] * q[i-r+j]; // check this!
-      /* std::cout << "r " <<  r << " j " << j << " " << std::endl; */
-    }
-  }
-
-
-  //calculate left and right weights form reconstructions on each variable separately 
-  //need r sets of weights (each applied to individual variables)
-  vector<ElasticState> w = omega(mat, vr, i, right);
-
-  for(unsigned int r = 0; r < k; r++)
-  {
-    for(unsigned int j = 0; j < ElasticState::e_size; j++)
-    {
-      weno[j] += w[r][j]*vr[r][j];
-    }
-  }
-  /* std::cout << weno << std::endl; */
-  return weno;
-}
-
-ElasticState flux(Material& mat, ElasticState& ql, ElasticState& qr, double dx, double dt);
-ElasticState rk3(ElasticState dq_dt, ElasticState q, double dt); //dq_dt, state, dt
-
-void solveXWENO(Material& mat, const double dt)
-{
-  //From Shu (1998) pg 353 
-  // weno constants C_rj
-  //  k = r + s + 1 = 3, 
-  // j = 0 to j = k - 1
-  //k = 3 order is 5 : 2k - 1 
-  // r has 4 possible values, but we iterate from 0 to 2
-  //for k = 3 
-  double dx = mat.dom.dx; //bug
-  vector<ElasticState> vl(mat.dom.GNi); // left reconstruction v_i-1/2(+) : 
-  vector<ElasticState> vr(mat.dom.GNi); // right reconstruction v_i+1/2(-) : 
-  vector<ElasticState> dv_dt(mat.dom.GNi);
-
-  //assuming boundary conditions already applied.
-  for (int i = mat.dom.starti-1; i < mat.dom.endi+1; i++)
-  {
-    //compute reconstructions
-    vr[i] = WENO_recon(mat, i, true);
-    /* vl[i] = WENO_recon(mat, i, false); */
-  }
-
-  /* outputAll("/home/raid/ma595/solid-1D/output/vl", vl); */
-  outputAll("/home/raid/ma595/solid-1D/output/vr", vr);
-  exit(1);
-
-  ElasticState vlr, vml, vmr, vrl;
-  ElasticState fl, fr;
- 
-  for (int i = mat.dom.starti; i < mat.dom.endi; i++)
-  {
-    vlr = vr[i-1];
-    vml = vl[i];
-    vmr = vr[i];
-    vrl = vl[i+1];
-    /* std::cout << qlr << " " << qml << " " << qmr << " " << qrl << std::endl; */
-
-    /* std::cout << mat.sys.flux(qlr) << std::endl; */
-    /* std::cout << mat.sys.flux(qml) << std::endl; */
-    /* double a = 5500; */
-    /* ElasticState fluxState =  mat.sys.flux(qlr) - mat.sys.flux(qml) + a * (qlr - qrl); */ 
-    fl = flux(mat, vlr, vml, dx, dt);
-    fr = flux(mat, vmr, vrl, dx, dt);
-
-    dv_dt[i] = (fl - fr)/dx; // rearranged to avoid implementing additional operators // this is the derivative l in J's code.
-  }
-
-
-  // rk3 time-stepping
- 
-  /* #pragma omp parallel for schedule(dynamic) */
-  for (int i = mat.dom.starti; i < mat.dom.endi; i++)
-  {
-    // test with normal euler time integration // what is the flux?
-    mat.sol[i] = rk3(dv_dt[i], mat.sol[i], dt); 
-  }
-
-
-  BCs(mat);
-  
-}
-  //need to do a similar thing as ppm: (RK timestepping)
-  /* for (int i = mat.dom.starti; i < mat.dom.endi; i++) */
-  /* { */
-  /*   double dt_dx = dt/dx; */
-  /*   ElasticState f_lf = (mat.sys.flux(vl) + mat.sys.flux(vr) + 1./dt_dx * (vl - vr))/2.; */
-  /*   ElasticState v_ri = 0.5*(vl + vr) + 0.5*dt_dx*(mat.sys.flux(vl) - mat.sys.flux(vr)); */
-  /*   return 0.5 * (f_lf + mat.sys.flux(v_ri)); */
-
-  /* } */
-  //compute force flux using WENO reconstructions 
-
-//need following functions:
-//ppm
-//--Q (Quadratic reconstruction)
-//--P (new reconstruction
-//--theta
-//--minmod
-//SolveXPPM
-//flux
-//step
 
 template <typename T> int sgn(T val) {
   return (T(0) < val) - (val < T(0));
@@ -325,218 +200,56 @@ template <typename T> double minmod(T a, T b)
   return (sgn(a) - sgn(b))*min(abs(a), abs(b))/2.;
 }
 
-//we don't need k here, all that's necessary is to use the state that we created 
-/* double L(k,j,x) */ 
-//If I was more intelligent, I could do this vectorwise instead of componentwise
 
-/* for(int j = 0; j < ElasticState::e_size; j++) */
-
-//do it component wise first:
-//limiter 
-//i is the integer we use to index the state
-/* double theta(Material& mat, const int i) */
-/* { */
-  
-/* } */
-
-/* //reconstruction */
-/* ElasticState P(Material) */
-/* { */
-
-/* } */
-
-/* double L(int k, int j,) */  
-/* { */
-  
-/* } */
-
-/* //k is the state index */
-/* //j is the solution index */
-// this can eventually be extended to be vectorised
-//
-// if using pointers, would have to dereference all the time
-// we can potentially speed all this up
-
-double Q(const Material& mat, int k, int j, double x)
+//row or col(could pass the entire matrix), dt, Nx, Ny, dirn
+//matrix, dt, dir, row/col val
+void solveXSLIC(Material& mat, const double dt, const int row)
 {
-  vector<ElasticState> q = mat.sol;
-  double dx = mat.dom.dx;
-  //partial derivatives:
-  double dd = (q[j+1][k] - 2.*q[j][k] + q[j-1][k])/pow(dx,2.); //second order derivative
-  double d2 = (q[j+1][k] - q[j-1][k])/(2.*dx); //
-  return q[j][k] - pow(dx,2.)*dd/24. + d2*x + dd*pow(x,2.)/2.; //this x can be +/- dx/2
+	int N = mat.dom.GNj;
+	vector<ElasticState> left(N);
+	vector<ElasticState> right(N);
+	const double dt_dX = dt/mat.dom.dx;
+
+  #pragma omp parallel for schedule(dynamic)
+	for(int j = mat.dom.startj - 1; j < mat.dom.endj + 1; ++j)
+	{
+		//extrapolated values (bar) pg 514 and slope pg 506.
+		const ElasticState slopebar = grad(mat.sol(row,j), mat.sol(row,j+1), mat.sol(row,j-1));
+    /* cout << slopebar << endl; */
+    /* double slopebarval = slopebar[0]; */
+    /* cout << slopebarval << endl; */
+		ElasticState Cleft = mat.sol(row,j) - 0.5*slopebar;
+		ElasticState Cright = mat.sol(row,j) + 0.5*slopebar;
+    /* if(Cleft != Cright) */
+    /*   cout << Cleft << "\n" << Cright << endl; */
+    /* cout << mat.sol(row,j+1) << endl; */
+		const ElasticState Cbar = 0.5*(dt_dX)*(mat.sys.flux(Cleft,0) - mat.sys.flux(Cright,0));
+/* Cleft.flux() - Cright.flux()); //change these flux functions */
+		left[j] = Cleft + Cbar;
+		right[j] = Cright + Cbar;
+	}		
+	
+	left[0] = mat.sol(row,0);
+	right[0] = mat.sol(row,0); //is required
+	left[1] = mat.sol(row,1);
+	right[1] = mat.sol(row,1); //is required
+	left[N-1] = mat.sol(row,N-1);
+	right[N-1] = mat.sol(row,N-1);	
+	left[N-2] = mat.sol(row,N-2);
+	right[N-2] = mat.sol(row,N-2);	
+
+	System sys = mat.sys;	
+	//3. calculate force flux using LF and RI, and calculate new cell averaged Ui pg 494
+  #pragma omp parallel for schedule(dynamic)
+	for(int j = mat.dom.startj-1; j < mat.dom.endj+1; j++)
+	{
+	  mat.sol(row,j) += dt_dX*(forceFlux(sys, left, right, dt_dX, j-1, 0) - forceFlux(sys, left, right, dt_dX, j, 0));
+	}
+	//printArray(U);
+	BCs(mat);
 }
 
-double L(const Material& mat, int k, int j, double x)
-{
-  vector<ElasticState> q = mat.sol;
-  const double dx = mat.dom.dx;
-  return q[j][k] + x*minmod((q[j][k] - q[j-1][k])/dx, (q[j+1][k] - q[j][k])/dx);
-}
-
-//this is the reconstruction
-ElasticState P(const Material& mat, int j, double x)
-{
-  ElasticState th = theta(mat, j);
-  ElasticState qn;
-  for(unsigned int k = 0; k < ElasticState::e_size; k++)
-  {
-    qn[k] = (1.0 - th[k])*L(mat,k,j,x) + th[k]*Q(mat,k,j,x);
-  }
-  return qn; 
-}
-
-// could eventually turn this function into something that is more lengthy 
-ElasticState theta(const Material& mat, int j)
-{
-  vector<ElasticState> q = mat.sol;
-  double xl = -mat.dom.dx/2.;
-  double xr = mat.dom.dx/2.;
-
-  ElasticState theta;
-
-  for(unsigned int k = 0; k < ElasticState::e_size; k++)
-  {
-    if(q[j-1][k] < q[j][k] && q[j][k] < q[j+1][k]) //a < b && b < c
-    {
-      double Qkjr = Q(mat,k,j,xr); double Lkjr = L(mat,k,j,xr);
-      double Qkjl = Q(mat,k,j,xl); double Lkjl = L(mat,k,j,xl);
-
-      double b1 = max(Qkjr, Qkjl) - Lkjr;
-
-      if(b1 == 0.0)
-        theta[k] = 1.0;
-
-      double b2 = max(Qkjr, Qkjl) - Lkjl;
-
-      if(b2 == 0.0)
-        theta[k] = 1.0;
-
-      if(b1 != 0 || b2 != 0){
-        double t1 = max((L(mat,k,j,xl) + L(mat,k,j+1,xl))/2., Q(mat,k,j+1,xl)) - Lkjr;
-        double t2 = min((L(mat,k,j,xr) + L(mat,k,j-1,xr))/2., Q(mat,k,j-1,xr)) - Lkjl;
-        theta[k] = min(t1/b1,min(t2/b2,1.0));
-      }
-    }
-    else if(q[j-1][k] > q[j][k] && q[j][k] > q[j+1][k])
-    {
-      double Qkjr = Q(mat,k,j,xr); double Lkjr = L(mat,k,j,xr);
-      double Qkjl = Q(mat,k,j,xl); double Lkjl = L(mat,k,j,xl);
-
-      double b1 = max(Qkjr, Qkjl) - Lkjl;
-
-      if(b1 == 0.0)
-        theta[k] = 1.0;
-
-      double b2 = max(Qkjr, Qkjl) - Lkjr;
-
-      if(b2 == 0.0)
-        theta[k] = 1.0;
-
-      if(b1 != 0 || b2 != 0){
-        double t1 = max((L(mat,k,j,xr) + L(mat,k,j-1,xr))/2., Q(mat,k,j-1,xr)) - Lkjl;
-        double t2 = min((L(mat,k,j,xl) + L(mat,k,j+1,xl))/2., Q(mat,k,j+1,xl)) - Lkjr;
-        theta[k] = min(t1/b1,min(t2/b2,1.0));
-      }
-    }
-    else 
-      theta[k] = 0.0;
-  }
-  return theta;
-}
-
-ElasticState flux(Material& mat, ElasticState& ql, ElasticState& qr, double dx, double dt)
-{
-  /* double a = 6000; // get this from material information */
-  /* std::cout << dx/dt << std::endl; */
-  /* return (mat.sys.flux(ql) + mat.sys.flux(qr) + a * (ql - qr))/2.; */
-
-  //compute force flux 
-  double dt_dx = dt/dx;
-  ElasticState f_lf = (mat.sys.flux(ql) + mat.sys.flux(qr) + 1./dt_dx * (ql - qr))/2.;
-  ElasticState q_ri = 0.5*(ql + qr) + 0.5*dt_dx*(mat.sys.flux(ql) - mat.sys.flux(qr));
-  return 0.5 * (f_lf + mat.sys.flux(q_ri));
-}
-
-ElasticState rk1(ElasticState dq_dt, ElasticState q, double dt)
-{
-  ElasticState q1 = q + dt*dq_dt;
-  return q1;
-}
-
-ElasticState rk3(ElasticState dq_dt, ElasticState q, double dt) //dq_dt, state, dt
-{
-  ElasticState q1 =    q                +    dt*dq_dt;
-  ElasticState q2 = 3.*q/4. +     q1/4. +    dt*dq_dt/4.;
-  ElasticState q3 =    q/3. +  2.*q2/3. + 2.*dt*dq_dt/3.;
-  return q3;
-}
-
-//runge kutta time stepping?
-void solveXPPM(Material& mat, const double dt) //evolve function
-{
-  double dx = mat.dom.dx; //bug
-  double xl = -dx/2.;
-  double xr = dx/2.;
-
-  vector<ElasticState> ql(mat.dom.GNi);
-  vector<ElasticState> qr(mat.dom.GNi);
-  vector<ElasticState> dq_dt(mat.dom.GNi);
-
-  //apply boundaries
-  //need to get the number of ghost cells correct here.
-  //3:104
-  /* #pragma omp parallel for schedule(dynamic) */
-  for (int i = mat.dom.starti-1; i < mat.dom.endi+1; i++) 
-  {
-    ql[i] = P(mat,i,xl); //left reconstruction
-    qr[i] = P(mat,i,xr); //left reconstruction
-  }
-
-
-#ifdef debugrun_
-  outputAll("/home/raid/ma595/solid-1D/output/ql", ql);
-  outputAll("/home/raid/ma595/solid-1D/output/qr", qr);
-  outputAll("/home/raid/ma595/solid-1D/output/barton1D", mat.sol);
-#endif
-
-  //compute fluxes between cells
-  //4:103 (3 ghost cells either side
-  ElasticState qlr, qml, qmr, qrl;
-  ElasticState fl, fr;
- 
-  for (int i = mat.dom.starti; i < mat.dom.endi; i++)
-  {
-    qlr = qr[i-1];
-    qml = ql[i];
-    qmr = qr[i];
-    qrl = ql[i+1];
-    /* std::cout << qlr << " " << qml << " " << qmr << " " << qrl << std::endl; */
-
-    /* std::cout << mat.sys.flux(qlr) << std::endl; */
-    /* std::cout << mat.sys.flux(qml) << std::endl; */
-    /* double a = 5500; */
-    /* ElasticState fluxState =  mat.sys.flux(qlr) - mat.sys.flux(qml) + a * (qlr - qrl); */ 
-    fl = flux(mat, qlr, qml, dx, dt);
-    fr = flux(mat, qmr, qrl, dx, dt);
-
-    dq_dt[i] = (fl - fr)/dx; // rearranged to avoid implementing additional operators // this is the derivative l in J's code.
-  }
-
-  // rk3 time-stepping
- 
-  /* #pragma omp parallel for schedule(dynamic) */
-  for (int i = mat.dom.starti; i < mat.dom.endi; i++)
-  {
-    // test with normal euler time integration // what is the flux?
-    mat.sol[i] = rk3(dq_dt[i], mat.sol[i], dt); 
-  }
-
-  BCs(mat);
-  
-}
-
-void solveXSLIC2D(Material& mat, const double dt)
+void solveYSLIC(Material& mat, const double dt, const int col)
 {
 	int N = mat.dom.GNi;
 	vector<ElasticState> left(N);
@@ -544,50 +257,50 @@ void solveXSLIC2D(Material& mat, const double dt)
 	const double dt_dX = dt/mat.dom.dx;
 
   #pragma omp parallel for schedule(dynamic)
-	for(int i = mat.dom.starti - 1; i < mat.dom.endi + 1; ++i) 
+	for(int i = mat.dom.starti - 1; i < mat.dom.endi + 1; ++i)
 	{
 		//extrapolated values (bar) pg 514 and slope pg 506.
-		const ElasticState slopebar = grad(mat, i);
-		ElasticState Cleft = mat.sol[i] - 0.5 * slopebar;
-		ElasticState Cright = mat.sol[i] + 0.5 * slopebar;
-		const ElasticState Cbar = 0.5 * (dt_dX) * (mat.sys.flux(Cleft) - mat.sys.flux(Cright));
-/* Cleft.flux() - Cright.flux()); //change these flux functions */
+		const ElasticState slopebar = grad(mat.sol(i,col), mat.sol(i+1,col), mat.sol(i-1,col));
+		ElasticState Cleft = mat.sol(i,col) - 0.5*slopebar;
+		ElasticState Cright = mat.sol(i,col) + 0.5*slopebar;
+		const ElasticState Cbar = 0.5*(dt_dX)*(mat.sys.flux(Cleft,1) - mat.sys.flux(Cright,1));
 		left[i] = Cleft + Cbar;
 		right[i] = Cright + Cbar;
 	}		
 	
-	left[0] = mat.sol[0];
-	right[0] = mat.sol[0]; //is required
-	left[1] = mat.sol[1];
-	right[1] = mat.sol[1]; //is required
-	left[N - 1] = mat.sol[N - 1];
-	right[N - 1] = mat.sol[N - 1];	
-	left[N - 2] = mat.sol[N - 2];
-	right[N - 2] = mat.sol[N - 2];	
+	left[0] = mat.sol(0,col);
+	right[0] = mat.sol(0,col); //is required
+	left[1] = mat.sol(1,col);
+	right[1] = mat.sol(1,col); //is required
+	left[N-1] = mat.sol(N-1,col);
+	right[N-1] = mat.sol(N-1,col);	
+	left[N-2] = mat.sol(N-2,col);
+	right[N-2] = mat.sol(N-2,col);	
 
 	System sys = mat.sys;	
 	//3. calculate force flux using LF and RI, and calculate new cell averaged Ui pg 494
   #pragma omp parallel for schedule(dynamic)
-	for(int i = mat.dom.starti - 1; i < mat.dom.endi + 1; i++)
+	for(int i = mat.dom.starti-1; i < mat.dom.endi + 1; i++)
 	{
-	  mat.sol[i] += dt_dX*(forceFlux(sys, left, right, dt_dX, i - 1) - forceFlux(sys, left, right, dt_dX, i));
+	  mat.sol(i,col) += dt_dX*(forceFlux(sys, left, right, dt_dX, i-1, 0) - forceFlux(sys, left, right, dt_dX, i, 0));
 	}
 	//printArray(U);
 	BCs(mat);
 }
 
 //Force flux calculation pg 512
-ElasticState grad(const Material& mat, int i)
+ElasticState grad(const ElasticState cons_i, const ElasticState cons_ip1, const ElasticState cons_im1)
 {
+  //opportunities to speed up here (check for equality)
+  //i,i+1,i-1
 	//1. calculate r
 	const double w = 1; // check this 
-	ElasticState num = mat.sol[i] - mat.sol[i-1];
-	ElasticState den = mat.sol[i+1] - mat.sol[i];
+	ElasticState num = cons_i - cons_im1;
+	ElasticState den = cons_ip1 - cons_i;
 	ElasticState r;
 	ElasticState delta = 0.5*(1+w)*num;// + 0.5*(1-w)*denom;
-	//aNew = Ui[i].soundSpeed();	
-	//cout << i << endl;	
-	for(unsigned int j = 0; j < ElasticState::e_size; j++)
+	
+  for(unsigned int j = 0; j < ElasticState::e_size; j++)
 	{	
 		if(num[j] == 0 && den[j] == 0)
 		{
@@ -612,41 +325,37 @@ ElasticState grad(const Material& mat, int i)
 	return delta; 
 } 
 
-//need to parallelise
 double getMinDt(const Material& mat)
 {
   System sys = mat.sys; 
-  double sharedmindt = std::numeric_limits<double>::max(); 
-#pragma omp parallel
+  double mindt = std::numeric_limits<double>::max();
+  for (int i = mat.dom.starti; i < mat.dom.endi; i++) 
   {
-    double mindt = std::numeric_limits<double>::max();
-#pragma omp for nowait schedule(dynamic)
-    for (int i = mat.dom.starti; i < mat.dom.endi; i++) 
+    for(int j = mat.dom.startj; j < mat.dom.endj; j++)
     {
-      double Smax = sys.getMaxWaveSpeed(sys.conservativeToPrimitive(mat.sol[i]),0);
-      mindt = min(mat.dom.dx/Smax, mindt);
+      ElasticPrimState prim = sys.conservativeToPrimitive(mat.sol(i,j));
+      double Smax_x = sys.getMaxWaveSpeed(prim,0);
+      double Smax_y = sys.getMaxWaveSpeed(prim,1);
+      mindt = min(mat.dom.dx/Smax_x, mindt);
+      mindt = min(mat.dom.dy/Smax_y, mindt);
     }	
-#pragma omp critical
-    {
-      sharedmindt = std::min(sharedmindt, mindt);
-    }
   }
-  return sharedmindt;
+  return mindt;
 }
 
-void printArray(Material mat)
-{
-	cout.precision(4);
-	for(int i = 0; i < 140; i++)
-	{
-		cout << '-';
-	}
-	cout << endl;
-	for(int i = 0; i < mat.dom.GNi; i++)
-	{
-		cout << setw(7) << left << i << ' ' << mat.sol[i] << endl;
-	}
-}
+/* void printArray(Material mat) */
+/* { */
+/* 	cout.precision(4); */
+/* 	for(int i = 0; i < 140; i++) */
+/* 	{ */
+/* 		cout << '-'; */
+/* 	} */
+/* 	cout << endl; */
+/* 	for(int i = 0; i < mat.dom.GNi; i++) */
+/* 	{ */
+/* 		cout << setw(7) << left << i << ' ' << mat.sol[i] << endl; */
+/* 	} */
+/* } */
 
 
 /**
@@ -713,29 +422,33 @@ double ksi_r(double r)
 
 //this function outputs the conservative state and all boundary conditions
 //may be better to include 
-void outputAll(string file, const vector<ElasticState> vec)
-{
-	ofstream output;	
-  output.open(file.c_str()); //we append all results to the same file 
-  int GCs = 3;
-  double dx = 1./(vec.size()-2*GCs);
-  double state;
-  for (int i = GCs; i < vec.size()-GCs; i++)
-  {
-	  output << (double)dx*((i-GCs)+0.5);
-    ElasticState consState = vec[i];	
-    for(unsigned int i = 0 ; i < ElasticState::e_size; i++)
-    {
-      if(consState[i] < 1e-20)
-        state = 0;
-      else
-        state = consState[i];
-      output << '\t' << state;
-    }
-    output << endl;
-  }
-  output.close();
-}
+/* void outputAll(string file, const Material mat) */
+/* { */
+/* 	ofstream output; */	
+/*   output.open(file.c_str()); //we append all results to the same file */ 
+/*   int GCs = 2; */
+
+
+/*   //this all needs to be changed */ 
+
+/*   double dx = 1./(vec.size()-2*GCs); */
+/*   double state; */
+/*   for (int i = GCs; i < vec.size()-GCs; i++) */
+/*   { */
+/* 	  output << (double)dx*((i-GCs)+0.5); */
+/*     ElasticState consState = matrix(i, j); */	
+/*     for(unsigned int i = 0 ; i < ElasticState::e_size; i++) */
+/*     { */
+/*       if(consState[i] < 1e-20) */
+/*         state = 0; */
+/*       else */
+/*         state = consState[i]; */
+/*       output << '\t' << state; */
+/*     } */
+/*     output << endl; */
+/*   } */
+/*   output.close(); */
+/* } */
 
 void outputGnu(string file, Material mat, int outStep, double t)
 {
@@ -785,58 +498,63 @@ void outputGnu(string file, Material mat, int outStep, double t)
   output.open(file.c_str(), ios::app);
   if(outStep != 0)
     output << "# t = " << t << endl;
-	for(int i = mat.dom.starti; i < mat.dom.endi; i++)
-	{
-		//stress (system), velocity (primState), entropy (EOS), invariants
-		const ElasticState consState = mat.sol[i];	
-		double rho = mat.sys.Density(consState);
-		const ElasticPrimState primState = mat.sys.conservativeToPrimitive(consState);
-		double entropy = primState.S_();
-		Vector3d u = primState.u_();
-		Vector3d inv = mat.sys.getInvariants(primState.F_());
-		Matrix3d sigma = mat.sys.stress(primState);
-  	const Matrix3d G = mat.sys.strainTensor(primState.F_());
-    // convert cell into 
-    // phys domain is mat.dom.Lx/cell 
-    // (i-2)*dx + dx/2
-    // dx*((i-mat.dom.starti) + 0.5)
-    //get invariants
+	/* for(int i = mat.dom.starti; i < mat.dom.endi; i++) */
+	/* { */
+    /* for(int j = mat.dom.startj; j < mat.dom.endj; j++) */
+    /* { */
+  for(int i = 0; i < mat.dom.GNi; i++)
+  {
+    for(int j = 0; j < mat.dom.GNj; j++)
+    {
+      //stress (system), velocity (primState), entropy (EOS), invariants
+      const ElasticState consState = mat.sol(i,j);	
+      double rho = mat.sys.Density(consState);
+      /* const ElasticPrimState primState = mat.sys.conservativeToPrimitive(consState); */
+      /* double entropy = primState.S_(); */
+      /* Vector3d u = primState.u_(); */
+      /* Vector3d inv = mat.sys.getInvariants(primState.F_()); */
+      /* Matrix3d sigma = mat.sys.stress(primState); */
+      /* const Matrix3d G = mat.sys.strainTensor(primState.F_()); */
     
-    
-		output << (double)mat.dom.dx*((i-mat.dom.starti)+0.5) << '\t'
-			<< rho/1e3 << '\t' 
-			<< u(0)/1000.<< '\t' 
-			<< u(1)/1000.<< '\t' 
-			<< u(2)/1000.<< '\t' 
-			<< sigma(0,0)/1e9 << '\t'
-			<< sigma(0,1)/1e9 << '\t'
-			<< sigma(0,2)/1e9 << '\t'
-			<< sigma(1,0)/1e9 << '\t'
-			<< sigma(1,1)/1e9 << '\t'
-			<< sigma(1,2)/1e9 << '\t'
-			<< sigma(2,0)/1e9 << '\t'
-			<< sigma(2,1)/1e9 << '\t'
-			<< sigma(2,2)/1e9 << '\t'
-			<< entropy/1e6 << '\t'
-			<< inv[0] << '\t'
-			<< inv[1] << '\t'
-			<< inv[2] << '\t' 
-      << G(0,0) << '\t'
-      << G(0,1) << '\t'
-      << G(0,2) << '\t'
-      << G(1,0) << '\t'
-      << G(1,1) << '\t'
-      << G(1,2) << '\t'
-      << G(2,0) << '\t'
-      << G(2,1) << '\t'
-      << G(2,2) << '\t'
-      << endl;
+      //output row wise
+      output << (double)mat.dom.dx*((j-mat.dom.startj)+0.5) << '\t' << (double)mat.dom.dy*((i-mat.dom.starti)+0.5) << '\t' << rho/1e3 << endl;
 
-		/* for(unsigned int j = 0; j < out.size(); j++) */
-		/* { */
-		/* 	output << '\t' << out[j]; */
-		/* } */
-		/* out.clear(); */
+       
+
+        /* << u(0)/1000.<< '\t' */ 
+        /* << u(1)/1000.<< '\t' */ 
+        /* << u(2)/1000.<< '\t' */ 
+        /* << sigma(0,0)/1e9 << '\t' */
+        /* << sigma(0,1)/1e9 << '\t' */
+        /* << sigma(0,2)/1e9 << '\t' */
+        /* << sigma(1,0)/1e9 << '\t' */
+        /* << sigma(1,1)/1e9 << '\t' */
+        /* << sigma(1,2)/1e9 << '\t' */
+        /* << sigma(2,0)/1e9 << '\t' */
+        /* << sigma(2,1)/1e9 << '\t' */
+        /* << sigma(2,2)/1e9 << '\t' */
+        /* << entropy/1e6 << '\t' */
+        /* << inv[0] << '\t' */
+        /* << inv[1] << '\t' */
+        /* << inv[2] << '\t' */ 
+        /* << G(0,0) << '\t' */
+        /* << G(0,1) << '\t' */
+        /* << G(0,2) << '\t' */
+        /* << G(1,0) << '\t' */
+        /* << G(1,1) << '\t' */
+        /* << G(1,2) << '\t' */
+        /* << G(2,0) << '\t' */
+        /* << G(2,1) << '\t' */
+        /* << G(2,2) << '\t' */
+        /* << endl; */
+
+      /* for(unsigned int j = 0; j < out.size(); j++) */
+      /* { */
+      /* 	output << '\t' << out[j]; */
+      /* } */
+      /* out.clear(); */
+    }
+    output << "\n";
 	}
   output << '\n' << std::endl;
 	output.close();	
@@ -849,12 +567,24 @@ void advance(Material& mat, const double dt) //or evolve?
 // cylindrical //spherical bcs //plasticity
   //series of advance functions: levelset, geometric bcs, 
   /* solveXWENO(mat, dt); */
-  solveXGodunov(mat, dt);
+  /* solveXGodunov(mat, dt); */
+
+  //x sweeps
+  for(int i = mat.dom.starti; i <mat.dom.endi; i++)
+  {
+    solveXSLIC(mat, dt, i);
+  }
+  //y sweeps
+  for(int j = mat.dom.startj; j <mat.dom.endj; j++)
+  {
+    solveYSLIC(mat, dt, j);
+  }
+
 }
 
 
-int solveSystem(InputSolid inputSolid, Material* mat){
-  
+int solveSystem(InputSolid inputSolid, Material* mat)
+{
   double t(0), dt(0), tend(inputSolid.end_time);
   const double CFL(inputSolid.input_CFL);
   //output names 
@@ -864,16 +594,19 @@ int solveSystem(InputSolid inputSolid, Material* mat){
   std::string outFile(outDir + outName);
   //delete existing output
   ofstream myfile;
+  cout << "Output file " << outFile << endl;
   myfile.open(outFile, ios::trunc); // this needs to be kept here (or have as an if statement)
   myfile.close();
+  //initial output
+  outputGnu(outFile, *mat, 0, 0);
 
 	while(t < tend)
 	{
 		BCs(*mat);
     #ifdef debugrun_
-    std::cout << "writing initial condition + BCs" << std::endl;
-    outputAll(outFile, (*mat).sol);
-    outputAll("/home/raid/ma595/solid-1D/output/initBCs", (*mat).sol);
+    /* std::cout << "writing initial condition + BCs" << std::endl; */
+    /* outputAll(outFile, (*mat).sol); */
+    /* outputAll("/home/raid/ma595/solid-1D/output/initBCs", (*mat).sol); */
     #endif
 		//1. calculate time step: CFL and boundary conditions pg 495
 		dt = getMinDt(*mat);
@@ -890,6 +623,7 @@ int solveSystem(InputSolid inputSolid, Material* mat){
     
     if(t >= outStep * outFreq) 
     {
+      /* std::string out(outFile + "_" + convertToStr(outStep)); */
       outputGnu(outFile, *mat, outStep, outStep*outFreq);
       cerr << "Saved results to output file " << outStep << "\n";
       ++outStep;
@@ -904,8 +638,11 @@ int solveSystem(InputSolid inputSolid, Material* mat){
 		cout << " [" << outStep << "] " << setw(6) << step << setw(6) << "Time " << setw(6) << t << " dt " << setw(6) << dt << 
 						setw(15) << " Remaining " << setw(6) <<tend-t<< endl;
 
-    advance(*mat, dt);
 
+    advance(*mat, dt);
+    /* std::string out(outFile + "_" + convertToStr(outStep)); */
+    /* outputGnu(outFile, *mat, 1, 10.); */
+    /* exit(1); */
 		t += dt;
     /* if(step == 1) */
     /* { */
@@ -1028,22 +765,25 @@ int main(int argc, char ** argv)
   inputSolid.readConfigFile(icStr);
 
   //create and initialize domain
-	Domain dom = Domain(inputSolid.cellCountX, 3, inputSolid.xMax);  //changed to 3 ghost cells for PPM
+  //2D domain: x corresponds to the j direction, y corresponds to the i direction 
+	Domain dom = Domain(inputSolid.cellCountY, inputSolid.cellCountX, 2, inputSolid.xMax);  //rows, cols, GC, 
+  cout << "input material " << inputSolid.matL << endl;
   ElasticEOS Eos(inputSolid.matL);
   Material* mat = new Material(inputSolid.matL, dom, Eos);
-
   //create left and right states and initialise
   ElasticPrimState primStateL(inputSolid.uL, inputSolid.FL, inputSolid.SL);
   ElasticPrimState primStateR(inputSolid.uR, inputSolid.FR, inputSolid.SR);
   double iface = inputSolid.iface;
-  ICInterface(*mat, iface, primStateL, primStateR);
-  outputAll("/home/raid/ma595/solid-1D/output/initial", (*mat).sol);
+  ICRiemann2D(*mat, primStateL, primStateR);
+  /* cout << (*mat).sol(100,100) << endl; */
+  std::string outDir(inputSolid.filePath), outName(inputSolid.fileName);
+  std::string outFile(outDir + outName);
+  outputGnu(outFile, *mat, 0, 0);
   //get limiter
   getLimiter(inputSolid);
 
   #ifdef debug_
   unitTests(*mat, primStateL, primStateR);
-  exit(1); //return 0
   #endif
   //solvesystem
   double begin = omp_get_wtime();

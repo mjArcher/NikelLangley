@@ -9,7 +9,7 @@ LDLIBS=-I ~/lib/ -I ~/lib/eigen/ -I ~/lib/eigen-dev/unsupported/ -I ~/lib/ -I ~/
 RM=rm -f
 # LDLIBS=-I ~/Libraries/eigen/ -I ~/Libraries/ -lconfig++ 
 
-SRCS=ElasticState.cpp ElasticPrimState.cpp SolidSystem.cpp ElasticEOS.cpp Utils.cpp SquareTensor3.cpp
+SRCS=ElasticState.cpp ElasticPrimState.cpp Domain.cpp SolidSystem.cpp ElasticEOS.cpp Utils.cpp SquareTensor3.cpp
 OBJS=$(subst .cpp,.o,$(SRCS))#substitutes all .cpp in SRCS variable with .o (objects)
 LDADD=#~/Libraries/lib/libconfig++.la
 LIBTOOL=~/Libraries/libconfig/libtool
@@ -23,7 +23,7 @@ SystemUnitTests: SystemUnitTests.o $(OBJS) $(LDADD)
 	rm -f EOSUnitTests
 	$(CXXLINK) $(CPPFLAGS) $(LDFLAGS) -o SystemUnitTests SystemUnitTests.o $(OBJS) $(LDLIBS) $(LDADD)
 
-Elastic2D.o: Elastic2D.cpp InputSolid.h ElasticState.h ElasticPrimState.h SolidSystem.h ElasticEOS.h Utils.h SquareTensor3.h 
+Elastic2D.o: Elastic2D.cpp InputSolid.h ElasticState.h ElasticPrimState.h Domain.hpp SolidSystem.h ElasticEOS.h Utils.h SquareTensor3.h 
 	$(CXX) $(CPPFLAGS) -c Elastic2D.cpp -o Elastic2D.o $(LDLIBS)
 
 SystemUnitTests.o: SystemUnitTests.cpp ElasticState.h ElasticPrimState.h SolidSystem.h ElasticEOS.h SquareTensor3.h
@@ -34,6 +34,9 @@ ElasticState.o: ElasticState.h ElasticState.cpp
 
 ElasticPrimState.o: ElasticPrimState.h ElasticPrimState.cpp
 	$(CXX) $(CPPFLAGS) -c ElasticPrimState.cpp -o ElasticPrimState.o $(LDLIBS)
+
+Domain.o: Domain.hpp Domain.cpp
+	$(CXX) $(CPPFLAGS) -c Domain.cpp -o Domain.o $(LDLIBS)
 
 SolidSystem.o: SolidSystem.h SolidSystem.cpp ElasticPrimState.h ElasticState.h ElasticEOS.h Utils.h
 	$(CXX) $(CPPFLAGS) -c SolidSystem.cpp -o SolidSystem.o $(LDLIBS)
