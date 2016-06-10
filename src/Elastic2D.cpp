@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <cmath>
+#include <math.h>
 #include <omp.h>
 #include <fenv.h>
 #include <ctime>
@@ -119,7 +120,6 @@ void ICRiemann2DTrivial(Material& mat,
   ElasticState stateL = mat.sys.primitiveToConservative(left);
   ElasticState stateR = mat.sys.primitiveToConservative(right);
 
-
   //trivial Riemann problem
   for(int i=mat.dom.starti; i<mat.dom.endi; ++i) {
     for(int j=mat.dom.startj; j<mat.dom.endj; ++j) {
@@ -137,9 +137,38 @@ void ICRiemann2DTrivial(Material& mat,
   cout << "Initialised 2D domain " << endl;
 }
 
+//general 2D Riemann initialisation 
+void ICRiemann2DAngle(Material& mat, double iface, double theta, const ElasticPrimState& left, const ElasticPrimState& right) 
+{
+  //  
+  ElasticState stateL = mat.sys.primitiveToConservative(left);
+  ElasticState stateR = mat.sys.primitiveToConservative(right);
+
+  cout << mat.sys.Density(left) << endl;
+
+  cout << mat.sys.Density(right) << endl;
+
+  //change in i alters the position of the interface 
+  //
+  /* cout <<  << endl; */
+  double ifaceInit = 0.01 + mat.dom.dx/2.;
+
+  for(int i=mat.dom.starti; i<mat.dom.endi; ++i) {
+    double y = (i-mat.dom.starti+0.5)*mat.dom.dy;
+    iface = ifaceInit - y*tan(theta*M_PI/180.);
+    for(int j=mat.dom.startj; j<mat.dom.endj; ++j) {
+      double x = (j-mat.dom.startj+0.5)*mat.dom.dx;
+      if(x < iface)
+        mat.sol(i,j) = stateL;
+      else
+        mat.sol(i,j) = stateR;
+    }
+  }
+
+}
+
 //45 degree angle
-void ICRiemann2D(Material& mat,
-    const ElasticPrimState& left, const ElasticPrimState& right) 
+void ICRiemann2D(Material& mat, const ElasticPrimState& left, const ElasticPrimState& right) 
 {
   //convert to conserved states
   ElasticState stateL = mat.sys.primitiveToConservative(left);
@@ -774,7 +803,8 @@ int main(int argc, char ** argv)
   ElasticPrimState primStateL(inputSolid.uL, inputSolid.FL, inputSolid.SL);
   ElasticPrimState primStateR(inputSolid.uR, inputSolid.FR, inputSolid.SR);
   double iface = inputSolid.iface;
-  ICRiemann2D(*mat, primStateL, primStateR);
+  double theta = 30;
+  ICRiemann2DAngle(*mat, iface, theta, primStateL, primStateR);
   /* cout << (*mat).sol(100,100) << endl; */
   std::string outDir(inputSolid.filePath), outName(inputSolid.fileName);
   std::string outFile(outDir + outName);
