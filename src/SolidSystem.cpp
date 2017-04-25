@@ -133,6 +133,26 @@ ElasticState System::flux(const ElasticState& consState, const ElasticPrimState&
 	/* Fl[12] = rho*u(0)*E_() - u(0)*sigma(0,0)-u(1)*sigma(0,1)-u(1)*sigma(0,2); */
 }
 
+ElasticState System::Source(const ElasticState& consL, const ElasticState& consR, const ElasticPrimState& pM, const int dirn) const 
+{
+  //is it possible to assign rhoFe currently to this?
+  Matrix3d rhoF;
+  Vector3d u = pM.u_();
+
+  const Matrix3d rhoFeL = consL.rhoF();
+  const Matrix3d rhoFeR = consR.rhoF();
+
+  for(int i =0; i<3; ++i) {
+    for(int j=0; j< 3; ++j) {
+      rhoF(i,j) = u(i)*(rhoFeL(dirn, j)-rhoFeR(dirn, j));
+    }
+  }
+
+  Vector3d mom = Vector3d::Zero();
+  ElasticState source(mom, rhoF, 0);
+
+  return source;
+}
 
 //kronecker in utility functions
 Matrix3d System::stress(const ElasticPrimState& primState) const

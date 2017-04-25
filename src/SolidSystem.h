@@ -90,6 +90,8 @@ class System {
 		
     ElasticState flux(const ElasticState& consState, const ElasticPrimState& primState, const int dirn) const;
 
+    ElasticState Source(const ElasticState&, const ElasticState&, const ElasticPrimState&, const int) const;
+
 		//! Symmetric matrix of stresses.
 		Eigen::Matrix3d stress(const ElasticPrimState&) const;
 

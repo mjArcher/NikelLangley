@@ -6,6 +6,9 @@
 #include <omp.h>
 #include <fenv.h>
 #include <ctime>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include "ElasticState.h"
 #include "ElasticPrimState.h"
@@ -72,7 +75,38 @@ struct Material {
 double slopelim(double);
 double ksi_r(double);
 ElasticState grad(const ElasticState, const ElasticState, const ElasticState);
+
 /* void outputAll(string, const ); */
+/* void offsetPeriodicBCs(Material& mat) */
+/* { */
+/*   double ifaceInit = 0.01 + mat.dom.dx/2.; */
+
+/*   for(int i=mat.dom.endi-2; i<mat.dom.endi; ++i) //red */
+/*   { */
+
+/*   } */
+
+
+/*   for(int i=mat.dom.starti; i<mat.dom.endi; ++i) { */
+/*     double y = (i-mat.dom.starti+0.5)*mat.dom.dy; */
+/*     iface = ifaceInit - y*tan(theta*M_PI/180.); */
+/*     for(int j=mat.dom.startj; j<mat.dom.endj; ++j) { */
+/*       double x = (j-mat.dom.startj+0.5)*mat.dom.dx; */
+/*       if(x < iface) */
+/*         mat.sol(i,j) = stateL; */
+/*       else */
+/*         mat.sol(i,j) = stateR; */
+/*     } */
+/*   } */
+
+/*   for(int j=mat.dom.startj; j<mat.dom.endj; ++j){ */
+/* #pragma omp parallel for schedule(dynamic) */
+/*     for(int i=0; i < mat.dom.starti; ++i) */
+/*     { */
+      
+/*     } */
+/*   } */
+/* } */
 
 void BCs(Material& mat) {  
   //transmissive boundary conditions 
@@ -136,6 +170,8 @@ void ICRiemann2DTrivial(Material& mat,
   }
   cout << "Initialised 2D domain " << endl;
 }
+
+
 
 //general 2D Riemann initialisation 
 void ICRiemann2DAngle(Material& mat, double iface, double theta, const ElasticPrimState& left, const ElasticPrimState& right) 
@@ -273,6 +309,9 @@ void solveXSLIC(Material& mat, const double dt, const int row)
 	for(int j = mat.dom.startj-1; j < mat.dom.endj+1; j++)
 	{
 	  mat.sol(row,j) += dt_dX*(forceFlux(sys, left, right, dt_dX, j-1, 0) - forceFlux(sys, left, right, dt_dX, j, 0));
+    //boundary extrapolated and limited states "left" and "right" 
+    //source term modification 
+    /* mat.sol(row,j) += dt_dX*(mat.sys.Source(left[j], right[j], mat.sys.conservativeToPrimitive(mat.sol(row,j)), 0)); */
 	}
 	//printArray(U);
 	BCs(mat);
@@ -776,6 +815,8 @@ void getLimiter(InputSolid inputSolid)
   }
 }
 
+struct stat st = {0};
+
 int main(int argc, char ** argv)
 {
   // Enable floating point error checking
@@ -806,8 +847,20 @@ int main(int argc, char ** argv)
   double theta = 30;
   ICRiemann2DAngle(*mat, iface, theta, primStateL, primStateR);
   /* cout << (*mat).sol(100,100) << endl; */
+
   std::string outDir(inputSolid.filePath), outName(inputSolid.fileName);
   std::string outFile(outDir + outName);
+
+  //this is a legitimate way to first check if a dir exists and then create one.
+  cout << "The output directory is " << outDir << endl;
+  if (stat(outDir.c_str(), &st) == -1) {
+    cout << "make directory " << outDir << endl;
+    /* mkdir(outDir.c_str(), 0700); */
+    std::string outPath("mkdir -p " + outDir);
+     system(outPath.c_str());
+  }
+
+
   outputGnu(outFile, *mat, 0, 0);
   //get limiter
   getLimiter(inputSolid);
